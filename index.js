@@ -73,8 +73,10 @@ async function createStatusEmbed() {
         const playerListFormatted = formatPlayerList(state.players);
 
         return new EmbedBuilder()
-            .setColor(0x0099FF)
-            .setTitle(`🔴 ${state.name}`) // اسم السيرفر في العنوان
+            // تم التعديل: اللون الأخضر لحالة التشغيل
+            .setColor(0x00FF00) 
+            // تم التعديل: عنوان واضح لحالة التشغيل
+            .setTitle(`🟢 Server Status: ${state.name}`) 
             .setURL(connectUrl) // جعل العنوان قابلاً للضغط (على الكمبيوتر)
             // هنا التعديل الرئيسي: وضعنا البانرات داخل الوصف باستخدام الماركدون
             .setDescription(
@@ -102,8 +104,10 @@ async function createStatusEmbed() {
     } catch (error) {
         console.error('Gamedig Error:', error.message);
         return new EmbedBuilder()
-            .setColor(0xFF0000)
-            .setTitle(`⚠️ Server Offline`)
+            // تم التعديل: اللون الأحمر لحالة عدم التشغيل
+            .setColor(0xFF0000) 
+            // تم التعديل: عنوان واضح لحالة عدم التشغيل
+            .setTitle(`⚠️ Server Offline`) 
             .setDescription(`**IP:** ${SERVER_IP}:${SERVER_PORT}\nServer is currently offline or unreachable.`)
             .setFooter({ text: `Check Time: ${new Date().toLocaleTimeString('en-GB')}` });
     }
