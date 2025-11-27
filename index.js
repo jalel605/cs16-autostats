@@ -124,8 +124,7 @@ async function startMonitor() {
         const initialEmbed = new EmbedBuilder().setDescription('🔄 **Fetching Server Info...**').setColor(0xFFFF00);
         const message = await webhookClient.send({
             username: 'CS 1.6 Monitor',
-            // **التصحيح**: تم إزالة الأقواس الزائدة لجعلها رابط URL خام
-            avatarURL: '[https://i.imgur.com/3w8m6oN.png](https://i.imgur.com/3w8m6oN.png)', 
+            // تم إزالة avatarURL لطلب المستخدم. سيستخدم الـ Webhook الصورة الافتراضية.
             embeds: [initialEmbed],
             fetchReply: true 
         });
@@ -148,6 +147,7 @@ async function updateLoop() {
 
     try {
         await webhookClient.editMessage(activeMessageId, {
+            username: 'CS 1.6 Monitor', // أبقينا اسم المستخدم لضمان الثبات
             embeds: [embed]
         });
         console.log('Stats updated.');
