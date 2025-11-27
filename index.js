@@ -50,8 +50,14 @@ function formatPlayerList(players) {
 // دالة لجلب المعلومات وإنشاء الـ Embed
 async function createStatusEmbed() {
     try {
-        // 1. الاتصال المباشر بالسيرفر لجلب الحالة وقائمة اللاعبين فقط
-        const state = await Gamedig.query({ type: 'cs16', host: SERVER_IP, port: SERVER_PORT, maxAttempts: 2 });
+        // تم التعديل: زيادة المهلة الزمنية (timeout) إلى 5 ثوانٍ وزيادة عدد المحاولات (maxAttempts)
+        const state = await Gamedig.query({ 
+            type: 'cs16', 
+            host: SERVER_IP, 
+            port: SERVER_PORT, 
+            maxAttempts: 3, // زيادة المحاولات
+            timeout: 5000 // 5 ثوان مهلة انتظار
+        });
         
         // تجهيز رابط الاتصال
         const connectUrl = `steam://connect/${SERVER_IP}:${SERVER_PORT}`;
@@ -65,7 +71,7 @@ async function createStatusEmbed() {
             // عنوان واضح لحالة التشغيل
             .setTitle(`🟢 Server Status: ${state.name}`) 
             .setURL(connectUrl) // جعل العنوان قابلاً للضغط (على الكمبيوتر)
-            // تم التعديل: إزالة جميع روابط GameTracker والبانرات
+            // وصف الرسالة
             .setDescription(
                 `**[ اضغط هنا للدخول للسيرفر 🎮](${connectUrl})**\n` +
                 `Connect: \`${SERVER_IP}:${SERVER_PORT}\``
@@ -83,6 +89,7 @@ async function createStatusEmbed() {
             .setTimestamp();
 
     } catch (error) {
+        // في حال فشل الاتصال بعد المحاولات والمهلة الجديدة، يعتبر السيرفر مغلق
         console.error('Gamedig Error (Server Offline):', error.message);
         return new EmbedBuilder()
             // اللون الأحمر لحالة عدم التشغيل
@@ -118,7 +125,7 @@ async function startMonitor() {
         console.log(`✅ Monitor Active. Msg ID: ${activeMessageId}`);
 
         updateLoop();
-        // التحديث كل دقيقة (60000 مللي ثانية) كما طلب المستخدم
+        // التحديث كل دقيقة (60000 مللي ثانية)
         setInterval(updateLoop, 60000); 
 
     } catch (error) {
@@ -132,7 +139,7 @@ async function updateLoop() {
     const embed = await createStatusEmbed();
 
     try {
-        // يتم تعديل الرسالة القديمة بدلاً من إرسال رسالة جديدة (طلب المستخدم)
+        // يتم تعديل الرسالة القديمة بدلاً من إرسال رسالة جديدة
         await webhookClient.editMessage(activeMessageId, {
             username: 'CS 1.6 Monitor', // أبقينا اسم المستخدم لضمان الثبات
             embeds: [embed]
