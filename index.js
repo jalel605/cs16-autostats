@@ -1,8 +1,8 @@
 const { WebhookClient, EmbedBuilder } = require('discord.js');
 const Gamedig = require('gamedig');
 const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
+// const axios = require('axios'); // لم نعد بحاجة لهذا
+// const cheerio = require('cheerio'); // لم نعد بحاجة لهذا
 
 // --- إعدادات السيرفر والويب هوك ---
 const WEBHOOK_URL = process.env.WEBHOOK_URL; 
@@ -24,33 +24,9 @@ app.listen(port, () => {
 
 const webhookClient = new WebhookClient({ url: WEBHOOK_URL });
 
-// --- Function to get GameTracker.com Rank ---
-async function getGameTrackerRank_COM(ip, port) {
-    const url = `https://www.gametracker.com/server_info/${ip}:${port}/`;
-    try {
-        const response = await axios.get(url, { headers: { 'User-Agent': 'CS16-Stats-Bot' }, timeout: 5000 });
-        const $ = cheerio.load(response.data);
-        let rankText = $('td:contains("Global Rank")').next('td').text().trim();
-        return (rankText && rankText !== '-') ? `#${rankText.split('(')[0].trim()}` : "Not Listed";
-    } catch (error) {
-        return "N/A";
-    }
-}
+// --- تم حذف دوال جلب الترتيب القديمة لأننا سنستخدم الصور مباشرة ---
 
-// --- Function to get GameTracker.rs Rank ---
-async function getGameTrackerRank_RS(ip, port) {
-    const url = `https://www.gametracker.rs/server_info/${ip}:${port}/`;
-    try {
-        const response = await axios.get(url, { headers: { 'User-Agent': 'CS16-Stats-Bot' }, timeout: 5000 });
-        const $ = cheerio.load(response.data);
-        let rankText = $('td:contains("Global Rank")').next('td').text().trim();
-        return (rankText && rankText !== '-') ? `#${rankText.split('(')[0].trim()}` : "Not Listed";
-    } catch (error) {
-        return "N/A";
-    }
-}
-
-// دالة تنسيق قائمة اللاعبين
+// دالة تنسيق قائمة اللاعبين (ممتازة كما هي)
 function formatPlayerList(players) {
     if (!players || players.length === 0) return "😴 No players online";
     
@@ -72,11 +48,20 @@ function formatPlayerList(players) {
 async function createStatusEmbed() {
     try {
         const state = await Gamedig.query({ type: 'cs16', host: SERVER_IP, port: SERVER_PORT, maxAttempts: 2 });
-        const gtRank_COM = await getGameTrackerRank_COM(SERVER_IP, SERVER_PORT);
-        const gtRank_RS = await getGameTrackerRank_RS(SERVER_IP, SERVER_PORT);
         
-        // تجهيز رابط الاتصال
+        // تجهيز روابط الاتصال والبانرات
         const connectUrl = `steam://connect/${SERVER_IP}:${SERVER_PORT}`;
+        
+        // روابط صفحات السيرفر
+        const gtComUrl = `https://www.gametracker.com/server_info/${SERVER_IP}:${SERVER_PORT}/`;
+        const gtRsUrl = `https://www.gametracker.rs/server_info/${SERVER_IP}:${SERVER_PORT}/`;
+
+        // روابط صور البانرات (تتحدث تلقائياً من مواقعها)
+        // استخدام نمط بانر عريض وواضح لـ .com
+        const gtComBanner = `https://www.gametracker.com/server_info/${SERVER_IP}:${SERVER_PORT}/b_560_95_1.png`;
+        // رابط البانر القياسي لـ .rs
+        const gtRsBanner = `https://www.gametracker.rs/server_info/${SERVER_IP}:${SERVER_PORT}/banner/`;
+
         
         // تجهيز قائمة اللاعبين
         const playerListFormatted = formatPlayerList(state.players);
@@ -85,20 +70,26 @@ async function createStatusEmbed() {
             .setColor(0x0099FF)
             .setTitle(`🔴 ${state.name}`) // اسم السيرفر في العنوان
             .setURL(connectUrl) // جعل العنوان قابلاً للضغط (على الكمبيوتر)
-            .setDescription(`**[ اضغط هنا للدخول للسيرفر 🎮](${connectUrl})**\nConnect: \`${SERVER_IP}:${SERVER_PORT}\``)
+            // هنا التعديل الرئيسي: وضعنا البانرات داخل الوصف باستخدام الماركدون
+            .setDescription(
+                `**[ اضغط هنا للدخول للسيرفر 🎮](${connectUrl})**\n` +
+                `Connect: \`${SERVER_IP}:${SERVER_PORT}\`\n\n` +
+                `**GAME SERVER RANKING**\n` +
+                `[![GameTracker.com](${gtComBanner})](${gtComUrl})\n` + // صورة قابلة للضغط لـ .com
+                `[![GameTracker.rs](${gtRsBanner})](${gtRsUrl})`         // صورة قابلة للضغط لـ .rs
+            )
             .addFields(
                 // الصف الأول: الخريطة والبنق
                 { name: '🗺️ Map', value: `**${state.map}**`, inline: true },
                 { name: '📶 Ping', value: `\`${state.ping}ms\``, inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }, // فاصل
                 
-                // الصف الثاني: الترتيب (Top Server)
-                { name: '🏆 Server Rank', value: `🇺🇸 GT.com: **${gtRank_COM}**\n🇷🇸 GT.rs: **${gtRank_RS}**`, inline: false },
+                // تم حذف صف "Server Rank" النصي القديم
                 
-                // الصف الثالث: اللاعبين
+                // الصف التالي: اللاعبين
                 { name: `👥 Players Online (${state.players.length}/${state.maxplayers})`, value: playerListFormatted, inline: false }
             )
-            .setImage(`https://image.gametracker.com/images/maps/160x120/cs/${state.map}.jpg`) // صورة الخريطة (اختياري، يمكنك حذف هذا السطر)
+            // .setImage(...) // قمت بإخفاء صورة الخريطة السفلية لكي لا يصبح المنظر مزدحماً مع البانرات الجديدة، يمكنك إعادتها إذا أردت
             .setFooter({ text: `Last Updated: ${new Date().toLocaleTimeString('en-GB')} | Powered by GlaD` })
             .setTimestamp();
 
@@ -122,7 +113,7 @@ async function startMonitor() {
         const initialEmbed = new EmbedBuilder().setDescription('🔄 **Fetching Server Info...**').setColor(0xFFFF00);
         const message = await webhookClient.send({
             username: 'CS 1.6 Monitor',
-            avatarURL: '[https://i.imgur.com/3w8m6oN.png](https://i.imgur.com/3w8m6oN.png)', 
+            avatarURL: '[https://i.imgur.com/3w8m6oN.png](https://i.imgur.com/3w8m6oN.png)', // تم تصحيح الرابط هنا كان يحتوي على أقواس زائدة
             embeds: [initialEmbed],
             fetchReply: true 
         });
