@@ -1,23 +1,7 @@
-{
-  "name": "cs16-autostats",
-  "version": "1.0.0",
-  "description": "CS 1.6 Auto-Refreshing Discord Bot",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "keywords": [
-    "discord",
-    "cs16",
-    "gamedig"
-  ],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
+"dependencies": {
     "axios": "^1.6.8",
     "cheerio": "^1.0.0-rc.12",
     "discord.js": "^14.14.1",
-    "express": "^4.18.3",
-    "gamedig": "^0.0.124"  <-- تأكد أن هذا هو الاسم الصحيح (بدون 'e')
+    "express": "^4.18.3",  <-- تأكد من وجود هذه الفاصلة!
+    "gamedig": "^0.0.124"
   }
-}
