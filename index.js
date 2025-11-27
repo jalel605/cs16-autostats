@@ -1,8 +1,8 @@
 const { WebhookClient, EmbedBuilder } = require('discord.js');
 const Gamedig = require('gamedig');
 const express = require('express');
-// const axios = require('axios'); // لم نعد بحاجة لهذا
-// const cheerio = require('cheerio'); // لم نعد بحاجة لهذا
+// const axios = require('axios'); // لا نحتاج إليه
+// const cheerio = require('cheerio'); // لا نحتاج إليه
 
 // --- إعدادات السيرفر والويب هوك ---
 // يجب التأكد من ضبط هذه المتغيرات في بيئة التشغيل
@@ -124,7 +124,7 @@ async function startMonitor() {
         const initialEmbed = new EmbedBuilder().setDescription('🔄 **Fetching Server Info...**').setColor(0xFFFF00);
         const message = await webhookClient.send({
             username: 'CS 1.6 Monitor',
-            // **تصحيح الخطأ**: يجب أن يكون الرابط سلسلة نصية بسيطة بدون أقواس Markdown
+            // **التصحيح**: تم إزالة الأقواس الزائدة لجعلها رابط URL خام
             avatarURL: '[https://i.imgur.com/3w8m6oN.png](https://i.imgur.com/3w8m6oN.png)', 
             embeds: [initialEmbed],
             fetchReply: true 
