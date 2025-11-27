@@ -5,6 +5,7 @@ const express = require('express');
 // const cheerio = require('cheerio'); // لم نعد بحاجة لهذا
 
 // --- إعدادات السيرفر والويب هوك ---
+// يجب التأكد من ضبط هذه المتغيرات في بيئة التشغيل
 const WEBHOOK_URL = process.env.WEBHOOK_URL; 
 const SERVER_IP = process.env.SERVER_IP || '127.0.0.1';
 const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 27015;
@@ -22,9 +23,14 @@ app.listen(port, () => {
 });
 // --------------------------------------------------
 
-const webhookClient = new WebhookClient({ url: WEBHOOK_URL });
+// التحقق من وجود رابط الويب هوك عند بدء التشغيل
+if (!WEBHOOK_URL) {
+    console.error("❌ CRITICAL ERROR: WEBHOOK_URL is not defined in environment variables. Bot cannot connect to Discord.");
+    // استخدام WebhookClient بـ URL غير صحيح سيتسبب في الفشل
+    // لكن سنسمح باستمرار التشغيل للسماح للخادم بالاستجابة لـ "Keep-Alive"
+}
 
-// --- تم حذف دوال جلب الترتيب القديمة لأننا سنستخدم الصور مباشرة ---
+const webhookClient = new WebhookClient({ url: WEBHOOK_URL });
 
 // دالة تنسيق قائمة اللاعبين (ممتازة كما هي)
 function formatPlayerList(players) {
@@ -109,11 +115,17 @@ let activeMessageId = null;
 async function startMonitor() {
     console.log('🔄 Starting Webhook Monitor...');
     
+    if (!WEBHOOK_URL) {
+        console.log('🔴 Cannot start Discord functions due to missing WEBHOOK_URL.');
+        return; 
+    }
+
     try {
         const initialEmbed = new EmbedBuilder().setDescription('🔄 **Fetching Server Info...**').setColor(0xFFFF00);
         const message = await webhookClient.send({
             username: 'CS 1.6 Monitor',
-            avatarURL: '[https://i.imgur.com/3w8m6oN.png](https://i.imgur.com/3w8m6oN.png)', // تم تصحيح الرابط هنا كان يحتوي على أقواس زائدة
+            // **تصحيح الخطأ**: يجب أن يكون الرابط سلسلة نصية بسيطة بدون أقواس Markdown
+            avatarURL: '[https://i.imgur.com/3w8m6oN.png](https://i.imgur.com/3w8m6oN.png)', 
             embeds: [initialEmbed],
             fetchReply: true 
         });
@@ -125,12 +137,12 @@ async function startMonitor() {
         setInterval(updateLoop, 60000); // تحديث كل دقيقة
 
     } catch (error) {
-        console.error('❌ Failed to send initial webhook message:', error);
+        console.error('❌ Failed to send initial webhook message. Check URL and Webhook permissions:', error.message);
     }
 }
 
 async function updateLoop() {
-    if (!activeMessageId) return;
+    if (!activeMessageId || !WEBHOOK_URL) return;
 
     const embed = await createStatusEmbed();
 
