@@ -1,15 +1,22 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { WebhookClient, EmbedBuilder } = require('discord.js');
 const Gamedig = require('gamedig');
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
+
+// --- إعدادات السيرفر والويب هوك ---
+// ضع رابط الويب هوك هنا أو في ملف .env
+const WEBHOOK_URL = process.env.WEBHOOK_URL; 
+// ضع أيبي وبورت السيرفر الذي تريد مراقبته هنا
+const SERVER_IP = process.env.SERVER_IP || '127.0.0.1';
+const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 27015;
 
 // --- Web Server Section (for Render Keep-Alive) ---
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-  res.send('CS 1.6 Bot is Online and Refreshing Stats! 🟢');
+  res.send('CS 1.6 Webhook Monitor is Online! 🟢');
 });
 
 app.listen(port, () => {
@@ -17,141 +24,125 @@ app.listen(port, () => {
 });
 // --------------------------------------------------
 
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
-});
-
-// Map to store active refresh intervals by channel ID
-const activeStats = new Map();
-
-const TOKEN = process.env.DISCORD_TOKEN; 
+// إنشاء عميل الويب هوك
+const webhookClient = new WebhookClient({ url: WEBHOOK_URL });
 
 // --- Function to get GameTracker.com Rank ---
 async function getGameTrackerRank_COM(ip, port) {
     const url = `https://www.gametracker.com/server_info/${ip}:${port}/`;
     try {
-        const response = await axios.get(url, { headers: { 'User-Agent': 'CS16-Stats-Bot' } });
+        const response = await axios.get(url, { headers: { 'User-Agent': 'CS16-Stats-Bot' }, timeout: 5000 });
         const $ = cheerio.load(response.data);
         let rankText = $('td:contains("Global Rank")').next('td').text().trim();
 
         if (rankText && rankText !== '-') {
             return rankText.split('(')[0].trim();
         } else {
-            return "Not Listed/Unknown";
+            return "Not Listed";
         }
     } catch (error) {
-        return "❌ GT.COM Connection Failed";
+        return "N/A";
     }
 }
 
 // --- Function to get GameTracker.rs Rank ---
 async function getGameTrackerRank_RS(ip, port) {
     const url = `https://www.gametracker.rs/server_info/${ip}:${port}/`;
-    
     try {
-        const response = await axios.get(url, { headers: { 'User-Agent': 'CS16-Stats-Bot' } });
+        const response = await axios.get(url, { headers: { 'User-Agent': 'CS16-Stats-Bot' }, timeout: 5000 });
         const $ = cheerio.load(response.data);
         let rankText = $('td:contains("Global Rank")').next('td').text().trim();
 
         if (rankText && rankText !== '-') {
             return rankText.split('(')[0].trim();
         } else {
-            return "Not Listed/Unknown";
+            return "Not Listed";
         }
-
     } catch (error) {
-        return "❌ GT.RS Connection Failed";
+        return "N/A";
     }
 }
 
-// --- The core refresh function (called every 60 seconds) ---
-async function refreshStats(sentMessage, ip, port) {
-    let state = null;
-    let gtRank_COM = "Fetching...";
-    let gtRank_RS = "Fetching...";
-
+// دالة لجلب المعلومات وإنشاء الـ Embed
+async function createStatusEmbed() {
     try {
-        state = await Gamedig.query({ type: 'cs16', host: ip, port: parseInt(port) });
-        gtRank_COM = await getGameTrackerRank_COM(ip, port); 
-        gtRank_RS = await getGameTrackerRank_RS(ip, port); 
-        
-        const embed = new EmbedBuilder()
+        const state = await Gamedig.query({ type: 'cs16', host: SERVER_IP, port: SERVER_PORT, maxAttempts: 2 });
+        const gtRank_COM = await getGameTrackerRank_COM(SERVER_IP, SERVER_PORT);
+        const gtRank_RS = await getGameTrackerRank_RS(SERVER_IP, SERVER_PORT);
+
+        return new EmbedBuilder()
             .setColor(0x0099FF)
-            .setTitle(`📊 Server Stats: ${state.name}`)
+            .setTitle(`📊 Monitor: ${state.name}`)
             .addFields(
                 { name: '🗺️ Map', value: state.map, inline: true },
                 { name: '👥 Players', value: `${state.players.length}/${state.maxplayers}`, inline: true },
                 { name: '📶 Ping', value: `${state.ping}ms`, inline: true },
-                { name: '🏆 GameTracker.com Rank', value: gtRank_COM, inline: true }, 
-                { name: '🇷🇸 GameTracker.rs Rank', value: gtRank_RS, inline: true }, 
-                { name: '\u200B', value: '\u200B', inline: true }, 
-                { name: '🔗 Quick Connect', value: `steam://connect/${ip}:${port}` }
+                { name: '🏆 GT.com', value: gtRank_COM, inline: true },
+                { name: '🇷🇸 GT.rs', value: gtRank_RS, inline: true },
+                { name: '🔗 Connect', value: `steam://connect/${SERVER_IP}:${SERVER_PORT}` }
             )
-            .setFooter({ text: `Last Updated: ${new Date().toLocaleTimeString()} | CS 1.6 Bot | Powered by GlaD` }) 
+            .setFooter({ text: `Last Updated: ${new Date().toLocaleTimeString('en-GB')} | CS 1.6 Webhook` })
             .setTimestamp();
-        
-        await sentMessage.edit({ content: ' ', embeds: [embed] });
 
     } catch (error) {
-        const errorEmbed = new EmbedBuilder()
+        console.error('Gamedig Error:', error.message);
+        return new EmbedBuilder()
             .setColor(0xFF0000)
-            .setTitle(`⚠️ Update Failed: ${ip}:${port}`)
-            .setDescription('❌ Server connection failed. Check IP. Retrying in next cycle.')
-            .setFooter({ text: `Last Attempt: ${new Date().toLocaleTimeString()}` });
-
-        await sentMessage.edit({ content: ' ', embeds: [errorEmbed] });
-        console.error('Error during refresh:', error.message);
+            .setTitle(`⚠️ Server Offline or Unreachable`)
+            .setDescription(`**IP:** ${SERVER_IP}:${SERVER_PORT}\nCould not query server info. Retrying...`)
+            .setFooter({ text: `Last Attempt: ${new Date().toLocaleTimeString('en-GB')}` });
     }
 }
-// --------------------------------------------------------
 
-client.once('ready', () => {
-    console.log(`✅ Logged in as ${client.user.tag}!`);
-    client.user.setActivity('Auto-Refreshing Stats', { type: 'Watching' });
-});
+// المتغير لتخزين رسالة الويب هوك التي سنقوم بتعديلها
+let activeMessageId = null;
 
-client.on('messageCreate', async message => {
-    if (message.author.bot) return;
-
-    if (message.content.startsWith('!stats')) {
-        const args = message.content.split(' ');
-
-        if (activeStats.has(message.channel.id)) {
-            return message.reply('🔄 Stats display already active in this channel. Use `!stopstats` to stop it first.');
-        }
+async function startMonitor() {
+    console.log('🔄 Starting Webhook Monitor...');
+    
+    // 1. إرسال رسالة أولية
+    try {
+        const initialEmbed = new EmbedBuilder().setDescription('🔄 **Initializing Monitor...**').setColor(0xFFFF00);
+        const message = await webhookClient.send({
+            username: 'CS 1.6 Server Status',
+            avatarURL: 'https://i.imgur.com/3w8m6oN.png', // يمكنك تغيير الصورة هنا
+            embeds: [initialEmbed],
+            fetchReply: true // مهم جداً للحصول على الأيدي
+        });
         
-        if (args.length < 2) {
-            return message.reply('❌ Please use the correct format:\n`!stats IP:PORT`');
-        }
+        activeMessageId = message.id;
+        console.log(`✅ Initial message sent with ID: ${activeMessageId}`);
 
-        const ipPort = args[1].split(':');
-        const ip = ipPort[0];
-        const port = ipPort[1] || 27015;
+        // 2. بدء التحديث الدوري (كل 60 ثانية)
+        updateLoop();
+        setInterval(updateLoop, 60000);
 
-        const sentMessage = await message.reply('🔄 Starting automatic stats refresh...');
-        await refreshStats(sentMessage, ip, port);
+    } catch (error) {
+        console.error('❌ Failed to send initial webhook message:', error);
+    }
+}
 
-        const intervalId = setInterval(() => {
-            refreshStats(sentMessage, ip, port);
-        }, 60000); // 60 seconds
+// دالة التحديث
+async function updateLoop() {
+    if (!activeMessageId) return;
 
-        activeStats.set(message.channel.id, intervalId);
+    const embed = await createStatusEmbed();
 
-    } else if (message.content.startsWith('!stopstats')) {
-        const intervalId = activeStats.get(message.channel.id);
-
-        if (intervalId) {
-            clearInterval(intervalId);
-            activeStats.delete(message.channel.id);
-            message.reply('🛑 Automatic server stats refresh stopped.');
-        } else {
-            message.reply('⚠️ No active stats refresh running in this channel.');
+    try {
+        await webhookClient.editMessage(activeMessageId, {
+            embeds: [embed]
+        });
+        console.log('Stats updated successfully.');
+    } catch (error) {
+        console.error('❌ Failed to edit webhook message:', error.message);
+        // في حالة حذف الرسالة، نعيد الإرسال من جديد
+        if (error.code === 10008) { // Unknown Message
+            console.log('⚠️ Message deleted, restarting monitor...');
+            activeMessageId = null;
+            startMonitor();
         }
     }
-});
+}
 
-client.login(TOKEN);
+// بدء التشغيل
+startMonitor();
