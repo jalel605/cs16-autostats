@@ -1,13 +1,12 @@
 const { WebhookClient, EmbedBuilder } = require('discord.js');
 const Gamedig = require('gamedig');
 const express = require('express');
-// const axios = require('axios'); // لا نحتاج إليه
-// const cheerio = require('cheerio'); // لا نحتاج إليه
 
 // --- إعدادات السيرفر والويب هوك ---
 // يجب التأكد من ضبط هذه المتغيرات في بيئة التشغيل
 const WEBHOOK_URL = process.env.WEBHOOK_URL; 
-const SERVER_IP = process.env.SERVER_IP || '127.0.0.1';
+// تم استخدام الـ IP والـ PORT من مثالك لضمان التشغيل
+const SERVER_IP = process.env.SERVER_IP || '57.129.66.21';
 const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 27015;
 
 // --- Web Server Section ---
@@ -26,8 +25,6 @@ app.listen(port, () => {
 // التحقق من وجود رابط الويب هوك عند بدء التشغيل
 if (!WEBHOOK_URL) {
     console.error("❌ CRITICAL ERROR: WEBHOOK_URL is not defined in environment variables. Bot cannot connect to Discord.");
-    // استخدام WebhookClient بـ URL غير صحيح سيتسبب في الفشل
-    // لكن سنسمح باستمرار التشغيل للسماح للخادم بالاستجابة لـ "Keep-Alive"
 }
 
 const webhookClient = new WebhookClient({ url: WEBHOOK_URL });
@@ -46,13 +43,14 @@ function formatPlayerList(players) {
         listStr += `\n...and ${players.length - maxShow} more`;
     }
     
-    // وضعناها داخل ``` لكي تظهر بشكل منظم
+    // وضعناها داخل ``` لكي تظهر بشكل منظم وعمودي
     return `\`\`\`\n${listStr}\n\`\`\``;
 }
 
 // دالة لجلب المعلومات وإنشاء الـ Embed
 async function createStatusEmbed() {
     try {
+        // الاتصال المباشر بالسيرفر لجلب الحالة وقائمة اللاعبين
         const state = await Gamedig.query({ type: 'cs16', host: SERVER_IP, port: SERVER_PORT, maxAttempts: 2 });
         
         // تجهيز روابط الاتصال والبانرات
@@ -63,9 +61,7 @@ async function createStatusEmbed() {
         const gtRsUrl = `https://www.gametracker.rs/server_info/${SERVER_IP}:${SERVER_PORT}/`;
 
         // روابط صور البانرات (تتحدث تلقائياً من مواقعها)
-        // استخدام نمط بانر عريض وواضح لـ .com
         const gtComBanner = `https://www.gametracker.com/server_info/${SERVER_IP}:${SERVER_PORT}/b_560_95_1.png`;
-        // رابط البانر القياسي لـ .rs
         const gtRsBanner = `https://www.gametracker.rs/server_info/${SERVER_IP}:${SERVER_PORT}/banner/`;
 
         
@@ -73,12 +69,12 @@ async function createStatusEmbed() {
         const playerListFormatted = formatPlayerList(state.players);
 
         return new EmbedBuilder()
-            // تم التعديل: اللون الأخضر لحالة التشغيل
+            // اللون الأخضر لحالة التشغيل
             .setColor(0x00FF00) 
-            // تم التعديل: عنوان واضح لحالة التشغيل
+            // عنوان واضح لحالة التشغيل
             .setTitle(`🟢 Server Status: ${state.name}`) 
             .setURL(connectUrl) // جعل العنوان قابلاً للضغط (على الكمبيوتر)
-            // هنا التعديل الرئيسي: وضعنا البانرات داخل الوصف باستخدام الماركدون
+            // وضعنا البانرات داخل الوصف باستخدام الماركدون
             .setDescription(
                 `**[ اضغط هنا للدخول للسيرفر 🎮](${connectUrl})**\n` +
                 `Connect: \`${SERVER_IP}:${SERVER_PORT}\`\n\n` +
@@ -92,21 +88,18 @@ async function createStatusEmbed() {
                 { name: '📶 Ping', value: `\`${state.ping}ms\``, inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }, // فاصل
                 
-                // تم حذف صف "Server Rank" النصي القديم
-                
-                // الصف التالي: اللاعبين
+                // الصف التالي: اللاعبين (هنا يتم عرض القائمة العمودية)
                 { name: `👥 Players Online (${state.players.length}/${state.maxplayers})`, value: playerListFormatted, inline: false }
             )
-            // .setImage(...) // قمت بإخفاء صورة الخريطة السفلية لكي لا يصبح المنظر مزدحماً مع البانرات الجديدة، يمكنك إعادتها إذا أردت
             .setFooter({ text: `Last Updated: ${new Date().toLocaleTimeString('en-GB')} | Powered by GlaD` })
             .setTimestamp();
 
     } catch (error) {
         console.error('Gamedig Error:', error.message);
         return new EmbedBuilder()
-            // تم التعديل: اللون الأحمر لحالة عدم التشغيل
+            // اللون الأحمر لحالة عدم التشغيل
             .setColor(0xFF0000) 
-            // تم التعديل: عنوان واضح لحالة عدم التشغيل
+            // عنوان واضح لحالة عدم التشغيل
             .setTitle(`⚠️ Server Offline`) 
             .setDescription(`**IP:** ${SERVER_IP}:${SERVER_PORT}\nServer is currently offline or unreachable.`)
             .setFooter({ text: `Check Time: ${new Date().toLocaleTimeString('en-GB')}` });
